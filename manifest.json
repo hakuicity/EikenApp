@@ -3,7 +3,7 @@
   "short_name": "英検",
   "description": "英検5級から準2級まで1,428問の練習問題",
   "start_url": "/EikenApp/",
-  "scope": "/EikenApp/"
+  "scope": "/EikenApp/",
   "display": "standalone",
   "orientation": "any",
   "background_color": "#F4F6F8",
@@ -16,9 +16,9 @@
   ],
   "screenshots": [],
   "shortcuts": [
-    { "name": "5級練習", "url": "/?level=5", "description": "英検5級の練習を開始" },
-    { "name": "4級練習", "url": "/?level=4", "description": "英検4級の練習を開始" },
-    { "name": "3級練習", "url": "/?level=3", "description": "英検3級の練習を開始" },
-    { "name": "準2級練習", "url": "/?level=P", "description": "英検準2級の練習を開始" }
+    { "name": "5級練習", "url": "/EikenApp/?level=5", "description": "英検5級の練習を開始" },
+    { "name": "4級練習", "url": "/EikenApp/?level=4", "description": "英検4級の練習を開始" },
+    { "name": "3級練習", "url": "/EikenApp/?level=3", "description": "英検3級の練習を開始" },
+    { "name": "準2級練習", "url": "/EikenApp/?level=P", "description": "英検準2級の練習を開始" }
   ]
 }
