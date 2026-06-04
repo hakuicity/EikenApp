@@ -2,7 +2,7 @@
   "name": "英検 Practice",
   "short_name": "英検",
   "description": "英検5級から準2級まで1,428問の練習問題",
-  "start_url": "/",
+  "start_url": "/EikenApp/",
   "display": "standalone",
   "orientation": "any",
   "background_color": "#F4F6F8",
