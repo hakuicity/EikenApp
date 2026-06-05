@@ -358,37 +358,30 @@ window.hk.onAuthChange(async function(user) {
   }
 });
 
-// ── Hook into app.js recordSession ───────────────────────────────────────────
-// We patch the existing recordSession function to also sync to Supabase.
-// This runs AFTER app.js has defined it, so we wrap the original.
-window.addEventListener('load', function patchRecordSession() {
-  const originalRecordSession = window.recordSession;
-  if (typeof originalRecordSession !== 'function') {
-    console.warn('[EikenAuth] recordSession not found — sync hooks not attached');
-    return;
-  }
-
+// ── Sync on session end ───────────────────────────────────────────────────────
+// Directly patch recordSession once DOM is ready (it's a global function in app.js)
+document.addEventListener('DOMContentLoaded', function() {
+  const _origRecord = window.recordSession;
   window.recordSession = function(res) {
-    // Call original localStorage save first
-    originalRecordSession(res);
+    // Always call the original localStorage save first
+    if (typeof _origRecord === 'function') _origRecord(res);
 
-    // Then sync to Supabase asynchronously (non-blocking)
+    // Then sync to Supabase
     (async function() {
       const user = await window.hk.getUser();
-      if (!user) return; // not logged in, skip
+      if (!user) return;
 
-      // Tally by category from results array
       const catMap = {};
       res.forEach(r => {
         const q = (window.questions || []).find(x => x.id === r.qId);
-        const cat = q ? q.cat : 'ALL';
+        const cat = q ? q.cat : 'VOCAB';
         if (!catMap[cat]) catMap[cat] = { correct: 0, total: 0 };
         catMap[cat].total++;
         if (r.chosen === r.correct) catMap[cat].correct++;
       });
 
-      // Overall
       const totalCorrect = res.filter(r => r.chosen === r.correct).length;
+
       await window.hk.syncQuizResult({
         level:    window.currentLevel || '5',
         setId:    window.currentSet   || '1',
@@ -397,9 +390,7 @@ window.addEventListener('load', function patchRecordSession() {
         total:    res.length
       });
 
-      // Per category
       for (const [cat, data] of Object.entries(catMap)) {
-        if (cat === 'ALL') continue;
         await window.hk.syncQuizResult({
           level:    window.currentLevel || '5',
           setId:    window.currentSet   || '1',
@@ -412,7 +403,7 @@ window.addEventListener('load', function patchRecordSession() {
       showSyncBadge('✓ 成績を保存しました');
     })();
   };
-
+});
   // Patch interview results sync (interview.js stores results in iv_sessionResults)
   // We hook into the results screen render
   const origShowIvResults = window.showIvResults;
