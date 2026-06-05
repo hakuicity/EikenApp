@@ -380,6 +380,12 @@ window.hk.onAuthChange(async function(user) {
         if (r.chosen === r.correct) catMap[cat].correct++;
       });
 
+      (function() {
+      const _origRecord = window.recordSession;
+      console.log('[HakuiSync] patching recordSession, found:', typeof _origRecord);
+      window.recordSession = function(res) {
+      console.log('[HakuiSync] recordSession called, results:', res.length);
+
       const totalCorrect = res.filter(r => r.chosen === r.correct).length;
 
       await window.hk.syncQuizResult({
