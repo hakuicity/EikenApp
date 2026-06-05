@@ -171,7 +171,7 @@ function buildMenu(){
     ib.innerHTML='<span class="menu-icon">🎤</span><div>'
       +'<div class="menu-label" style="color:#FF6F00">面接練習</div>'
       +'<div class="menu-desc">スピーキング / 10セッション</div></div>';
-    ib.onclick=openInterviewMenu;
+    ib.onclick=()=>{ if(typeof openInterviewMenu==='function') openInterviewMenu(); else console.error('[EikenApp] interview.js not loaded - openInterviewMenu undefined'); };
     g.appendChild(ib);
   }
 }
