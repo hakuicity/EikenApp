@@ -1,224 +1,346 @@
-<!DOCTYPE html>
-<html lang="ja">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="theme-color" content="#1565C0">
-  <meta name="description" content="英検 Practice — 英検5級から準2級まで1,428問の練習問題">
-  <meta name="mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="default">
-  <meta name="apple-mobile-web-app-title" content="英検 Practice">
-  <link rel="manifest" href="manifest.json">
-  <link rel="apple-touch-icon" href="icons/icon-192.png">
-  <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
-  <title>英検 Practice</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css">
-</head>
-<body>
+// Eiken Practice App — main application logic
+'use strict';
 
-<div class="page-layout">
-<div class="main-col" id="app">
+const BADGE_BG={VOCAB:"#E8F5E9",GRAMMAR:"#E3F2FD",CONVERSATION:"#FFF3E0",ORDER:"#F3E5F5"};
+const BADGE_FG={VOCAB:"#2E7D32",GRAMMAR:"#1565C0",CONVERSATION:"#E65100",ORDER:"#6A1B9A"};
+const CAT_LABEL={VOCAB:"語い",GRAMMAR:"文法",CONVERSATION:"会話",ORDER:"語順"};
+const CAT_ICON={VOCAB:"📖",GRAMMAR:"✏️",CONVERSATION:"💬",ORDER:"🔤"};
+const CAT_COLOR={VOCAB:"#2E7D32",GRAMMAR:"#1565C0",CONVERSATION:"#E65100",ORDER:"#6A1B9A"};
+const CATS=["VOCAB","GRAMMAR","CONVERSATION","ORDER"];
+const MENU_ITEMS=[
+  {key:"ALL",label:"すべての問題",icon:"📝"},
+  {key:"VOCAB",label:"語い",icon:"📖"},
+  {key:"GRAMMAR",label:"文法",icon:"✏️"},
+  {key:"CONVERSATION",label:"会話",icon:"💬"},
+  {key:"ORDER",label:"語順",icon:"🔤"},
+];
 
-  <div id="menu-screen">
-    <div class="header">
-      <div class="header-icon" id="hdr-icon">英検</div>
-      <h1 id="hdr-title">英検 Practice</h1>
-      <p id="hdr-sub">1,428 問題 · 4 レベル · 3 セット</p>
-    </div>
+let currentLevel="5", currentSet="1", questions=[];
+let pool=[],idx=0,selected=null,answered=false,results=[];
+let darkMode = localStorage.getItem("eiken_dark")==="1";
 
-    <!-- Level tabs + theme toggle -->
-    <div class="top-controls">
-      <div class="level-tabs" id="level-tabs">
-        <button class="level-tab" data-level="5">5級</button>
-        <button class="level-tab" data-level="4">4級</button>
-        <button class="level-tab" data-level="3">3級</button>
-        <button class="level-tab" data-level="P">準2級</button>
-      </div>
-      <button class="theme-btn" id="theme-btn" title="ライト/ダークモード">🌙</button>
-    </div>
+const $=id=>document.getElementById(id);
+const show=id=>{$(id).classList.remove("hidden");};
+const hide=id=>{$(id).classList.add("hidden");};
+function hideAll(){["menu-screen","quiz-screen","review-screen","stats-screen"].forEach(hide);}
+function escHtml(s){return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");}
+function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
+function cfg(){return LEVEL_CFG[currentLevel];}
 
-    <!-- Set tabs -->
-    <div class="set-tabs" id="set-tabs">
-      <button class="set-tab active" data-set="1">セット 1</button>
-      <button class="set-tab" data-set="2">セット 2</button>
-      <button class="set-tab" data-set="3">セット 3</button>
-    </div>
+// ── Dark mode ─────────────────────────────────────────────────
+function applyDark(){
+  document.body.classList.toggle("dark", darkMode);
+  $("theme-btn").textContent = darkMode ? "☀️" : "🌙";
+}
+$("theme-btn").onclick=function(){
+  darkMode=!darkMode;
+  localStorage.setItem("eiken_dark", darkMode?"1":"0");
+  applyDark();
+};
 
-    <div class="menu-grid" id="menu-grid"></div>
-    <p class="footer">レベルとセットを選んでください</p>
-  </div>
+// ── Theme (accent colours) ────────────────────────────────────
+function applyTheme(){
+  const c=cfg();
+  document.querySelectorAll(".level-tab").forEach(t=>{
+    const active=t.getAttribute("data-level")===currentLevel;
+    t.classList.toggle("active",active);
+    t.style.background=active?c.accent:"";
+    t.style.borderColor=active?c.accent:"";
+  });
+  document.querySelectorAll(".set-tab").forEach(t=>{
+    const active=t.getAttribute("data-set")===currentSet;
+    t.classList.toggle("active",active);
+    t.style.background=active?c.accent:"";
+    t.style.borderColor=active?c.accent:"";
+  });
+  $("hdr-icon").style.background=c.accent;
+  $("hdr-title").textContent="英検"+c.label+" Practice";
+  $("next-btn").style.background=c.accent;
+  $("prog-bar").style.background="linear-gradient(90deg,"+c.accent+","+c.accentMid+")";
+  $("modal-confirm").style.background=c.accent;
+}
 
-  <div id="quiz-screen" class="hidden">
-    <div class="quiz-topbar">
-      <button class="quit-btn" id="quit-btn">← メニュー</button>
+// ── Side panel tracker ────────────────────────────────────────
+function buildTracker(){
+  const grid=$("tracker-grid");
+  grid.innerHTML="";
+  // Set CSS custom property for current accent colour
+  $("side-panel").style.setProperty("--accent-color", cfg().accent);
+  // Row per question: num + 4 option cells (A B C D)
+  pool.forEach(function(q,i){
+    // row number
+    const num=document.createElement("div");
+    num.className="tracker-row-num";
+    num.textContent=String(i+1).padStart(2,"0");
+    grid.appendChild(num);
+    // 4 option cells
+    q.opts.forEach(function(opt,oi){
+      const cell=document.createElement("div");
+      cell.className="tracker-cell";
+      cell.id="tc-"+i+"-"+oi;
+      cell.textContent=oi+1;
+      cell.title=opt;
+      grid.appendChild(cell);
+    });
+  });
+  $("panel-title").textContent=cfg().label+" 進捗";
+  $("side-panel").classList.add("visible");
+  document.body.classList.add("has-panel");
+}
 
-    </div>
-    <div class="progress-wrap"><div class="progress-bar" id="prog-bar"></div></div>
-    <div class="progress-text" id="prog-text"></div>
-    <div class="q-card">
-      <span class="badge" id="q-badge"></span>
-      <p class="q-text" id="q-text"></p>
-    </div>
-    <div class="opts" id="opts"></div>
-    <div class="explanation hidden" id="explanation">
-      <span class="explanation-title">解説：</span>
-      <span id="exp-text"></span>
-    </div>
-    <div class="feedback hidden" id="feedback">
-      <span id="fb-text"></span>
-      <button class="next-btn" id="next-btn">次へ →</button>
-    </div>
-    <div class="run-score" id="run-score"></div>
-  </div>
+function updateTracker(){
+  pool.forEach(function(q,i){
+    q.opts.forEach(function(opt,oi){
+      const cell=$("tc-"+i+"-"+oi);
+      if(!cell) return;
+      // reset
+      cell.className="tracker-cell";
+      // current row highlight
+      if(i===idx) cell.classList.add("current-row");
+      // answered
+      if(results[i]){
+        const chosen=results[i].chosen;
+        const correct=results[i].correct;
+        if(oi===chosen && chosen===correct) cell.classList.add("chosen-correct");
+        else if(oi===chosen && chosen!==correct) cell.classList.add("chosen-wrong");
+      }
+    });
+  });
+  // scroll current row into view
+  const cur=$("tc-"+idx+"-0");
+  if(cur) cur.scrollIntoView({block:"nearest",behavior:"smooth"});
+}
 
-  <div id="review-screen" class="hidden">
-    <div class="review-header">
-      <div class="score-circle" id="rv-circle">
-        <div class="score-pct" id="rv-pct"></div>
-        <div class="score-label" id="rv-label"></div>
-      </div>
-      <h2 class="grade-text" id="rv-grade"></h2>
-    </div>
-    <div id="rv-stats-breakdown"></div>
-    <div class="wrong-section" id="wrong-section"></div>
-    <button class="primary-btn" id="back-btn">メニューに戻る</button>
-  </div>
+function hideTracker(){
+  $("side-panel").classList.remove("visible");
+  $("tracker-grid").innerHTML="";
+  document.body.classList.remove("has-panel");
+}
 
-  <div id="stats-screen" class="hidden">
-    <div class="stats-header">
-      <h2>📊 成績</h2>
-      <p id="stats-sub">あなたの通算成績</p>
-    </div>
-    <div class="stats-overall" id="stats-overall"></div>
-    <div id="stats-cats"></div>
-    <div class="stats-btn-row">
-      <button class="primary-btn" id="stats-back-btn">メニューに戻る</button>
-    </div>
-    <div class="stats-btn-row">
-      <button class="danger-btn" id="stats-reset-btn">成績をリセット</button>
-    </div>
-  </div>
-</div>
+// ── Modal ─────────────────────────────────────────────────────
+let modalResolveFn=null;
+function openModal(title,msg,confirmLabel){
+  $("modal-title").textContent=title;$("modal-msg").textContent=msg;
+  $("modal-confirm").textContent=confirmLabel||"確認";
+  show("modal");
+  return new Promise(resolve=>{modalResolveFn=resolve;});
+}
+$("modal-cancel").onclick=()=>{hide("modal");if(modalResolveFn)modalResolveFn(false);};
+$("modal-confirm").onclick=()=>{hide("modal");if(modalResolveFn)modalResolveFn(true);};
 
-</div><!-- end main-col -->
+// ── Stats ─────────────────────────────────────────────────────
+function defaultStats(){const s={totalRight:0,totalWrong:0,sessions:0};CATS.forEach(c=>{s[c]={right:0,wrong:0};});return s;}
+function loadStats(){try{return JSON.parse(localStorage.getItem(cfg().statsKey))||defaultStats();}catch(e){return defaultStats();}}
+function saveStats(s){try{localStorage.setItem(cfg().statsKey,JSON.stringify(s));}catch(e){}}
+function recordSession(res){
+  const s=loadStats();s.sessions++;
+  res.forEach(r=>{const q=questions.find(x=>x.id===r.qId);const ok=r.chosen===r.correct;
+    if(ok){s.totalRight++;s[q.cat].right++;}else{s.totalWrong++;s[q.cat].wrong++;}});
+  saveStats(s);
+}
 
-<!-- Side panel tracker -->
-<div class="side-panel" id="side-panel">
-  <div class="side-panel-title" id="panel-title">進捗</div>
-  <div class="tracker-grid" id="tracker-grid"></div>
-</div>
+// ── Menu ──────────────────────────────────────────────────────
+function switchLevel(lv){currentLevel=lv;questions=[...ALL_SETS[lv][currentSet]];buildMenu();applyTheme();}
+function switchSet(st){currentSet=st;questions=[...ALL_SETS[currentLevel][st]];buildMenu();applyTheme();}
 
-</div><!-- end page-layout -->
+function buildMenu(){
+  const c=cfg(),g=$("menu-grid");g.innerHTML="";
+  MENU_ITEMS.forEach(item=>{
+    const count=item.key==="ALL"?questions.length:questions.filter(q=>q.cat===item.key).length;
+    if(count===0)return;
+    const color=item.key==="ALL"?"#37474F":CAT_COLOR[item.key];
+    const btn=document.createElement("button");btn.className="menu-card";
+    btn.style.borderLeft="4px solid "+color;
+    btn.innerHTML='<span class="menu-icon">'+item.icon+'</span><div>'
+      +'<div class="menu-label" style="color:'+color+'">'+item.label+'</div>'
+      +'<div class="menu-desc">'+count+' 問</div></div>';
+    btn.onclick=()=>startQuiz(item.key);
+    g.appendChild(btn);
+  });
+  const sb=document.createElement("button");sb.className="menu-card";
+  sb.style.borderLeft="4px solid #FF8F00";
+  sb.innerHTML='<span class="menu-icon">📊</span><div>'
+    +'<div class="menu-label" style="color:#FF8F00">成績 ('+c.label+')</div>'
+    +'<div class="menu-desc">あなたの成績履歴</div></div>';
+  sb.onclick=showStats;g.appendChild(sb);
 
-<!-- ═══════════════════════════════════════════════════════════ -->
-<!-- INTERVIEW SCREENS -->
-<!-- ═══════════════════════════════════════════════════════════ -->
+  // Interview button — only for levels 3 and P
+  if(currentLevel==='3'||currentLevel==='P'){
+    const ib=document.createElement("button");ib.className="menu-card";
+    ib.style.borderLeft="4px solid #FF6F00";
+    ib.innerHTML='<span class="menu-icon">🎤</span><div>'
+      +'<div class="menu-label" style="color:#FF6F00">面接練習</div>'
+      +'<div class="menu-desc">スピーキング / 10セッション</div></div>';
+    ib.onclick=()=>{ if(typeof openInterviewMenu==='function') openInterviewMenu(); else console.error('[EikenApp] interview.js not loaded - openInterviewMenu undefined'); };
+    g.appendChild(ib);
+  }
+}
 
-<!-- Level picker -->
-<div id="iv-level-screen" class="hidden">
-  <div class="header">
-    <div class="header-icon" id="iv-hdr-icon" style="background:#37474F">英検</div>
-    <h1>面接練習</h1>
-    <p>Interview Speaking Practice</p>
-  </div>
-  <div class="iv-level-grid">
-    <button class="iv-level-btn" data-iv-level="3"
-      style="border-color:#512DA8">
-      <span class="iv-level-badge" style="background:#512DA8">3級</span>
-      <div class="iv-level-info">
-        <div class="iv-level-name" style="color:#512DA8">英検3級 面接</div>
-        <div class="iv-level-desc">パッセージ・イラスト・意見 / 10セッション</div>
-      </div>
-    </button>
-    <button class="iv-level-btn" data-iv-level="P"
-      style="border-color:#00897B">
-      <span class="iv-level-badge" style="background:#00897B">準2級</span>
-      <div class="iv-level-info">
-        <div class="iv-level-name" style="color:#00897B">英検準2級 面接</div>
-        <div class="iv-level-desc">パッセージ・2イラスト・意見 / 10セッション</div>
-      </div>
-    </button>
-  </div>
-  <button class="primary-btn" id="iv-back-to-menu" style="margin-top:20px">← メインメニューへ</button>
-</div>
+function goMenu(){hideAll();hideTracker();show("menu-screen");}
 
-<!-- Session picker -->
-<div id="iv-session-screen" class="hidden">
-  <div class="header">
-    <h1 id="iv-session-title">セッション選択</h1>
-    <p>練習するトピックを選んでください</p>
-  </div>
-  <div id="iv-session-grid" class="menu-grid"></div>
-  <button class="primary-btn" id="iv-back-to-levels" style="margin-top:16px">← レベル選択へ</button>
-</div>
+// ── Quiz ──────────────────────────────────────────────────────
+function startQuiz(cat){
+  const filtered=cat==="ALL"?[...questions]:questions.filter(q=>q.cat===cat);
+  if(filtered.length===0){alert("このセットにこのカテゴリーの問題はありません。");return;}
+  pool=shuffle(filtered);idx=0;selected=null;answered=false;results=[];
+  hideAll();show("quiz-screen");
+  buildTracker();
+  renderQuestion();
+}
 
-<!-- Quiz / speaking screen -->
-<div id="iv-quiz-screen" class="hidden">
-  <div class="quiz-topbar">
-    <button class="quit-btn" id="iv-quit-session">← セッション一覧</button>
-    <span id="iv-progress" style="font-size:13px;color:var(--text3)"></span>
-  </div>
+// Shuffled option order per question (rebuilt each render)
+let _optOrder = [];
 
-  <div class="iv-topic-bar">
-    <span id="iv-phase-label" style="font-size:13px;color:var(--text2)"></span>
-    <span id="iv-topic-label" style="font-size:14px;font-weight:700"></span>
-  </div>
+function renderQuestion(){
+  const q=pool[idx];
+  $("prog-bar").style.width=(((idx+1)/pool.length)*100)+"%";
+  $("prog-text").textContent="問題 "+(idx+1)+" / "+pool.length;
+  $("q-badge").textContent=CAT_LABEL[q.cat];
+  $("q-badge").style.background=BADGE_BG[q.cat];
+  $("q-badge").style.color=BADGE_FG[q.cat];
+  $("q-text").textContent=q.q;
 
-  <div id="iv-content-area" class="iv-content-area"></div>
+  // Shuffle option display order, keeping track of where correct ans ends up
+  _optOrder = [0,1,2,3];
+  for(let i=3;i>0;i--){const j=Math.floor(Math.random()*(i+1));[_optOrder[i],_optOrder[j]]=[_optOrder[j],_optOrder[i]];}
 
-  <div id="iv-transcript-area" class="iv-transcript-area"></div>
-  <div id="iv-feedback-area" class="iv-feedback-area"></div>
+  const opts=$("opts");opts.innerHTML="";
+  _optOrder.forEach(function(origIdx,displayPos){
+    const btn=document.createElement("button");btn.className="opt-btn";
+    btn.innerHTML='<span class="opt-letter">'+String.fromCharCode(65+displayPos)+'</span>'+escHtml(q.opts[origIdx]);
+    btn.onclick=function(){handleSelect(displayPos);};
+    opts.appendChild(btn);
+  });
+  hide("feedback");hide("explanation");updateRunScore();
+  updateTracker();
+}
 
-  <div class="iv-action-row">
-    <button class="iv-btn-listen" id="iv-btn-listen">🔊 聞く</button>
-    <button class="iv-btn-record" id="iv-btn-record" style="display:none">🎤 回答を話す</button>
-  </div>
-  <div class="iv-action-row" style="margin-top:8px">
-    <button class="iv-btn-reveal" id="iv-btn-reveal" style="display:none">📖 模範解答を見る</button>
-    <button class="next-btn" id="iv-btn-next" style="display:none">次へ →</button>
-  </div>
-</div>
+function handleSelect(oi){
+  if(answered)return;
+  selected=oi;answered=true;
+  const q=pool[idx];
+  // oi is the display position; find its original option index
+  const chosenOrigIdx = _optOrder[oi];
+  const isCorrect = chosenOrigIdx === q.ans;
+  // Find which display position holds the correct answer
+  const correctDisplayPos = _optOrder.indexOf(q.ans);
+  results[idx]={qId:q.id,chosen:oi,correct:correctDisplayPos,origChosen:chosenOrigIdx,origCorrect:q.ans};
+  $("opts").querySelectorAll(".opt-btn").forEach(function(b,i){
+    b.classList.add("locked");
+    if(i===correctDisplayPos)b.classList.add("correct");
+    else if(i===oi&&!isCorrect)b.classList.add("wrong");
+  });
+  $("fb-text").textContent=isCorrect?"✅ 正解！":"❌ 正解は："+q.opts[q.ans];
+  $("exp-text").textContent=q.exp;
+  show("explanation");
+  $("next-btn").textContent=idx+1>=pool.length?"結果を見る →":"次へ →";
+  show("feedback");updateRunScore();
+  updateTracker();
+}
 
-<!-- Results screen -->
-<div id="iv-results-screen" class="hidden">
-  <div class="review-header">
-    <div class="score-circle" id="iv-result-circle">
-      <div class="score-pct" id="iv-result-pct"></div>
-      <div class="score-label">平均スコア</div>
-    </div>
-    <h2 class="grade-text" id="iv-result-grade"></h2>
-    <p style="color:var(--text3);font-size:13px;margin-top:4px" id="iv-result-topic"></p>
-  </div>
-  <div id="iv-result-detail" class="iv-result-detail"></div>
-  <button class="primary-btn" id="iv-results-retry">🔄 もう一度練習</button>
-  <button class="danger-btn" id="iv-results-menu" style="margin-top:10px">← セッション一覧へ</button>
-</div>
+function nextQuestion(){
+  if(idx+1>=pool.length){finishQuiz();return;}
+  idx++;selected=null;answered=false;renderQuestion();
+}
+function updateRunScore(){
+  var cor=Object.values(results).filter(r=>r.chosen===r.correct).length;
+  var tot=Object.keys(results).length;
+  var p=tot>0?Math.round(cor/tot*100):0;
+  $("run-score").textContent="得点："+cor+" / "+tot+(tot>0?" ("+p+"%)":"");
+}
+async function quitQuiz(){
+  if(Object.keys(results).length>0){
+    var ok=await openModal("クイズを終了しますか？","現在の回答は成績に保存されますが、結果画面は表示されません。","終了する");
+    if(!ok)return;recordSession(Object.values(results));
+  }
+  goMenu();
+}
+function finishQuiz(){recordSession(Object.values(results));showReview();}
 
-<div id="modal" class="modal-overlay hidden">
-  <div class="modal-box">
-    <h3 id="modal-title">確認</h3>
-    <p id="modal-msg">よろしいですか？</p>
-    <div class="modal-btns">
-      <button class="modal-cancel" id="modal-cancel">キャンセル</button>
-      <button class="modal-confirm" id="modal-confirm">確認</button>
-    </div>
-  </div>
-</div>
-
-<script src="questions.js"></script>
-<script src="app.js"></script>
-<script src="interview.js"></script>
-<script>
-  if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-      navigator.serviceWorker.register('sw.js')
-        .then(r => console.log('SW registered:', r.scope))
-        .catch(e => console.warn('SW failed:', e));
+// ── Review ────────────────────────────────────────────────────
+function showReview(){
+  hideAll();hideTracker();show("review-screen");
+  const c=cfg();
+  const res=Object.values(results);
+  var cor=res.filter(r=>r.chosen===r.correct).length,tot=res.length,p=Math.round(cor/tot*100);
+  $("rv-pct").textContent=p+"%";$("rv-pct").style.color=c.accent;
+  $("rv-label").textContent=cor+" / "+tot;
+  $("rv-circle").style.borderColor=c.accent;
+  $("rv-grade").textContent=p>=80?"🎉 素晴らしい！":p>=60?"👍 よくできました！":"📚 もっと頑張りましょう！";
+  var catData={};
+  res.forEach(r=>{var q=questions.find(x=>x.id===r.qId);if(!catData[q.cat])catData[q.cat]={right:0,wrong:0};
+    if(r.chosen===r.correct)catData[q.cat].right++;else catData[q.cat].wrong++;});
+  var bd=$("rv-stats-breakdown");bd.innerHTML="";
+  if(Object.keys(catData).length>1){
+    var h='<div style="margin:0 0 12px"><h3 style="font-size:14px;font-weight:700;color:var(--text2);margin-bottom:8px">カテゴリー別の成績</h3>';
+    CATS.forEach(cat=>{if(!catData[cat])return;var d=catData[cat],tot=d.right+d.wrong,pct=Math.round(d.right/tot*100);
+      h+='<div class="stats-cat-card"><div class="stats-cat-row"><span class="stats-cat-name" style="color:'+CAT_COLOR[cat]+'">'+CAT_ICON[cat]+' '+CAT_LABEL[cat]+'</span>'
+        +'<span class="stats-cat-nums">'+d.right+' / '+tot+' ('+pct+'%)</span></div>'
+        +'<div class="stats-bar-track"><div class="stats-bar-correct" style="width:'+pct+'%;background:'+CAT_COLOR[cat]+';opacity:.7"></div></div></div>';});
+    h+='</div>';bd.innerHTML=h;
+  }
+  var wrong=res.filter(r=>r.chosen!==r.correct);
+  var sec=$("wrong-section");sec.innerHTML="";
+  if(wrong.length>0){
+    sec.innerHTML='<h3 class="wrong-title" style="color:'+c.accent+'">間違えた問題 ('+wrong.length+')</h3>';
+    wrong.forEach(r=>{
+      var q=questions.find(x=>x.id===r.qId);
+      var card=document.createElement("div");card.className="wrong-card";
+      card.innerHTML='<span class="badge" style="background:'+BADGE_BG[q.cat]+';color:'+BADGE_FG[q.cat]+'">'+CAT_LABEL[q.cat]+'</span>'
+        +'<p class="wrong-q">'+escHtml(q.q)+'</p>'
+        +'<p style="font-size:13px;color:var(--text2)">あなたの回答：<span style="color:'+c.accent+'">'+escHtml(q.opts[r.origChosen])+'</span></p>'
+        +'<p style="font-size:13px;color:var(--text2);margin-top:2px">正解：<span style="color:'+c.accent+';font-weight:700">'+escHtml(q.opts[r.origCorrect])+'</span></p>'
+        +'<p class="wrong-exp">解説：'+escHtml(q.exp)+'</p>';
+      sec.appendChild(card);
     });
   }
-</script>
-</body>
-</html>
+}
+
+// ── Stats screen ──────────────────────────────────────────────
+function showStats(){
+  hideAll();hideTracker();show("stats-screen");
+  const c=cfg();
+  $("stats-sub").textContent=c.label+" の通算成績";
+  var s=loadStats(),tot=s.totalRight+s.totalWrong,pct=tot>0?Math.round(s.totalRight/tot*100):0;
+  $("stats-overall").innerHTML=
+    '<div class="stats-big"><div class="stats-big-num" style="color:'+c.accent+'">'+s.sessions+'</div><div class="stats-big-label">セッション数</div></div>'
+    +'<div class="stats-big"><div class="stats-big-num" style="color:'+c.accent+'">'+tot+'</div><div class="stats-big-label">回答数</div></div>'
+    +'<div class="stats-big"><div class="stats-big-num" style="color:'+c.accent+'">'+pct+'%</div><div class="stats-big-label">正答率</div></div>';
+  var cc=$("stats-cats");cc.innerHTML="";
+  if(tot===0){cc.innerHTML='<p style="text-align:center;color:var(--text3);padding:18px 0">まだデータがありません。</p>';return;}
+  CATS.forEach(cat=>{
+    var d=s[cat],t=d.right+d.wrong;if(t===0)return;
+    var p=Math.round(d.right/t*100),wp=100-p;
+    var card=document.createElement("div");card.className="stats-cat-card";
+    card.innerHTML='<div class="stats-cat-row"><span class="stats-cat-name" style="color:'+CAT_COLOR[cat]+'">'+CAT_ICON[cat]+' '+CAT_LABEL[cat]+'</span>'
+      +'<span class="stats-cat-nums">正解 '+d.right+' · 不正解 '+d.wrong+'</span></div>'
+      +'<div class="stats-bar-track"><div class="stats-bar-correct" style="width:'+p+'%;background:'+CAT_COLOR[cat]+';opacity:.75"></div>'
+      +'<div class="stats-bar-wrong" style="width:'+wp+'%;background:'+c.barWrong+'"></div></div>'
+      +'<div class="stats-detail"><span>'+p+'% 正解</span><span>計 '+t+'問</span></div>';
+    cc.appendChild(card);
+  });
+}
+async function resetStatsConfirm(){
+  var ok=await openModal("成績をリセットしますか？","「"+cfg().label+"」のすべての成績データが削除されます。","リセット");
+  if(!ok)return;saveStats(defaultStats());showStats();
+}
+
+// ── Event wiring ──────────────────────────────────────────────
+document.querySelectorAll(".level-tab").forEach(tab=>{
+  tab.addEventListener("click",function(){switchLevel(this.getAttribute("data-level"));});
+});
+document.querySelectorAll(".set-tab").forEach(tab=>{
+  tab.addEventListener("click",function(){switchSet(this.getAttribute("data-set"));});
+});
+$("next-btn").onclick=nextQuestion;
+$("back-btn").onclick=goMenu;
+$("quit-btn").onclick=quitQuiz;
+$("stats-back-btn").onclick=goMenu;
+$("stats-reset-btn").onclick=resetStatsConfirm;
+
+// ── Init ──────────────────────────────────────────────────────
+applyDark();
+// Support ?level= URL shortcut (from manifest shortcuts)
+const _urlLevel = new URLSearchParams(window.location.search).get('level');
+const _validLevels = ['5','4','3','P'];
+switchLevel(_validLevels.includes(_urlLevel) ? _urlLevel : '5');
