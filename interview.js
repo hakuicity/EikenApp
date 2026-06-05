@@ -182,13 +182,13 @@ function renderPassagePhase() {
   $iv('iv-btn-reveal').style.display = 'none';
   $iv('iv-btn-next').style.display = 'none';
   $iv('iv-btn-next').textContent = '質問へ進む →';
-  $iv('iv-btn-next').onclick = () => { ivPhase = 'question'; renderQuestion(); };
+  $iv('iv-btn-next').onclick = () => { ivPhase = 'question'; ivRenderQuestion(); };
   $iv('iv-transcript-area').innerHTML = '';
   $iv('iv-feedback-area').innerHTML = '';
 }
 
 // ── Question phase ────────────────────────────────────────────
-function renderQuestion() {
+function ivRenderQuestion() {
   const s = ivSession;
   const q = s.questions[ivQIdx];
   const c = LEVEL_CFG[ivLevel];
@@ -279,7 +279,7 @@ function handleRecord() {
       $iv('iv-btn-next').onclick = () => {
         stopSpeaking();
         if (ivQIdx+1 >= ivSession.questions.length) showInterviewResults();
-        else { ivQIdx++; renderQuestion(); }
+        else { ivQIdx++; ivRenderQuestion(); }
       };
     },
     err => {
@@ -365,7 +365,7 @@ function initInterviewListeners() {
       nextBtn.onclick = () => {
         stopSpeaking();
         if (ivQIdx+1 >= ivSession.questions.length) showInterviewResults();
-        else { ivQIdx++; renderQuestion(); }
+        else { ivQIdx++; ivRenderQuestion(); }
       };
     }
   });
