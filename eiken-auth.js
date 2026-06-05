@@ -204,9 +204,19 @@
 // ── Modal helpers ─────────────────────────────────────────────────────────────
 let _currentAuthForm = 'login';
 
-function openAuthModal() {
+async function openAuthModal() {
   document.getElementById('hk-auth-modal').classList.remove('hidden');
   clearAuthMessages();
+  const user = await window.hk.getUser();
+  if (user) {
+    const profile = await window.hk.getProfile(user.id);
+    const name = (profile && profile.display_name) ? profile.display_name : user.email;
+    document.getElementById('hk-loggedin-name').textContent = name;
+    document.getElementById('hk-loggedin-email').textContent = user.email;
+    showAuthForm('loggedin');
+  } else {
+    showAuthForm('login');
+  }
 }
 
 function closeAuthModal() {
