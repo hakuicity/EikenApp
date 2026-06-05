@@ -7,6 +7,7 @@ const ASSETS = [
   BASE + '/style.css',
   BASE + '/app.js',
   BASE + '/questions.js',
+  BASE + '/interview.js',
   BASE + '/manifest.json',
   BASE + '/icons/icon-192.png',
   BASE + '/icons/icon-512.png',

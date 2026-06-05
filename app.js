@@ -163,6 +163,17 @@ function buildMenu(){
     +'<div class="menu-label" style="color:#FF8F00">成績 ('+c.label+')</div>'
     +'<div class="menu-desc">あなたの成績履歴</div></div>';
   sb.onclick=showStats;g.appendChild(sb);
+
+  // Interview button — only for levels 3 and P
+  if(currentLevel==='3'||currentLevel==='P'){
+    const ib=document.createElement("button");ib.className="menu-card";
+    ib.style.borderLeft="4px solid #FF6F00";
+    ib.innerHTML='<span class="menu-icon">🎤</span><div>'
+      +'<div class="menu-label" style="color:#FF6F00">面接練習</div>'
+      +'<div class="menu-desc">スピーキング / 10セッション</div></div>';
+    ib.onclick=openInterviewMenu;
+    g.appendChild(ib);
+  }
 }
 
 function goMenu(){hideAll();hideTracker();show("menu-screen");}
