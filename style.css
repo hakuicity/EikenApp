@@ -67,10 +67,10 @@
   .header p { font-size: 13px; color: var(--text3); margin: 3px 0 0; }
 
   .menu-grid { display: flex; flex-direction: column; gap: 9px; }
-  .menu-card { display: flex; align-items: center; gap: 12px; padding: 13px 15px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; cursor: pointer; text-align: left; box-shadow: 0 1px 3px var(--shadow); transition: box-shadow .15s, transform .1s; }
+  .menu-card { display: flex; align-items: center; gap: 12px; padding: 13px 15px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; cursor: pointer; text-align: left; box-shadow: 0 1px 3px var(--shadow); color: var(--text); transition: box-shadow .15s, transform .1s; }
   .menu-card:hover { box-shadow: 0 3px 10px var(--shadow); transform: translateY(-1px); }
   .menu-icon { font-size: 25px; flex-shrink: 0; }
-  .menu-label { font-size: 15px; font-weight: 700; }
+  .menu-label { font-size: 15px; font-weight: 700; color: var(--text); }
   .menu-desc { font-size: 12px; color: var(--text3); margin-top: 2px; }
   .footer { text-align: center; color: var(--text3); font-size: 13px; margin-top: 18px; }
 
@@ -157,7 +157,7 @@
   .iv-level-name { font-size: 16px; font-weight: 700; }
   .iv-level-desc { font-size: 12px; color: var(--text3); margin-top: 3px; }
 
-  .iv-session-btn { display: flex; align-items: center; gap: 12px; padding: 13px 15px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; cursor: pointer; text-align: left; font-family: inherit; box-shadow: 0 1px 3px var(--shadow); transition: all .15s; }
+  .iv-session-btn { display: flex; align-items: center; gap: 12px; padding: 13px 15px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; cursor: pointer; text-align: left; font-family: inherit; color: var(--text); box-shadow: 0 1px 3px var(--shadow); transition: all .15s; }
   .iv-session-btn:hover { transform: translateY(-1px); box-shadow: 0 3px 10px var(--shadow); }
   .iv-session-num { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 8px; color: #fff; font-size: 14px; font-weight: 800; flex-shrink: 0; }
   .iv-session-title { font-size: 15px; font-weight: 700; color: var(--text); }
@@ -205,3 +205,5 @@
   .iv-result-row { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; }
   .iv-result-q { font-size: 13px; font-weight: 600; color: var(--text2); margin-bottom: 6px; }
   .iv-result-transcript { font-size: 14px; color: var(--text); font-style: italic; margin-bottom: 4px; }
+
+  .opt-btn.pending { font-weight: 700; }

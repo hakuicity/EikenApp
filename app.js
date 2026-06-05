@@ -211,21 +211,41 @@ function renderQuestion(){
     btn.onclick=function(){handleSelect(displayPos);};
     opts.appendChild(btn);
   });
+  _pendingOi=null;
   hide("feedback");hide("explanation");updateRunScore();
   updateTracker();
 }
 
+// Pending selection before confirm
+let _pendingOi = null;
+
 function handleSelect(oi){
   if(answered)return;
-  selected=oi;answered=true;
+  const btns=$("opts").querySelectorAll(".opt-btn");
+  // Second click on same option confirms it
+  if(_pendingOi===oi){ commitAnswer(oi); return; }
+  // First click — highlight, wait for second click
+  _pendingOi=oi;
+  btns.forEach(function(b,i){
+    b.classList.remove("pending");
+    b.style.borderColor=""; b.style.background="";
+  });
+  btns[oi].classList.add("pending");
+  btns[oi].style.borderColor=cfg().accent;
+  btns[oi].style.background=cfg().accentLight;
+}
+
+function commitAnswer(oi){
+  if(answered)return;
+  _pendingOi=null;
+  selected=oi; answered=true;
   const q=pool[idx];
-  // oi is the display position; find its original option index
-  const chosenOrigIdx = _optOrder[oi];
-  const isCorrect = chosenOrigIdx === q.ans;
-  // Find which display position holds the correct answer
-  const correctDisplayPos = _optOrder.indexOf(q.ans);
+  const chosenOrigIdx=_optOrder[oi];
+  const isCorrect=chosenOrigIdx===q.ans;
+  const correctDisplayPos=_optOrder.indexOf(q.ans);
   results[idx]={qId:q.id,chosen:oi,correct:correctDisplayPos,origChosen:chosenOrigIdx,origCorrect:q.ans};
   $("opts").querySelectorAll(".opt-btn").forEach(function(b,i){
+    b.classList.remove("pending"); b.style.borderColor=""; b.style.background="";
     b.classList.add("locked");
     if(i===correctDisplayPos)b.classList.add("correct");
     else if(i===oi&&!isCorrect)b.classList.add("wrong");
@@ -234,8 +254,7 @@ function handleSelect(oi){
   $("exp-text").textContent=q.exp;
   show("explanation");
   $("next-btn").textContent=idx+1>=pool.length?"結果を見る →":"次へ →";
-  show("feedback");updateRunScore();
-  updateTracker();
+  show("feedback"); updateRunScore(); updateTracker();
 }
 
 function nextQuestion(){
