@@ -1,5 +1,5 @@
 // Eiken Practice — Service Worker
-const CACHE_NAME = 'eiken-practice-v2';
+const CACHE_NAME = 'eiken-practice-v3';
 const BASE = '/EikenApp';
 const ASSETS = [
   BASE + '/',

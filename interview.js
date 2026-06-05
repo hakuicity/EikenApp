@@ -296,25 +296,7 @@ function handleRecord() {
   );
 }
 
-// ── Model answer reveal ───────────────────────────────────────
-$iv('iv-btn-reveal').onclick = function() {
-  const q = ivSession.questions[ivQIdx];
-  const existing = $iv('iv-feedback-area').innerHTML;
-  $iv('iv-feedback-area').innerHTML = existing
-    + '<div class="iv-model-answer"><div class="iv-model-label">模範解答：</div>'
-    + '<div class="iv-model-text">' + escHtml(q.model) + '</div></div>';
-  this.style.display = 'none';
-  speakText(q.model);
-  if ($iv('iv-btn-next').style.display === 'none') {
-    $iv('iv-btn-next').style.display = '';
-    $iv('iv-btn-next').textContent = ivQIdx+1 >= ivSession.questions.length ? '結果を見る →' : '次の質問 →';
-    $iv('iv-btn-next').onclick = () => {
-      stopSpeaking();
-      if (ivQIdx+1 >= ivSession.questions.length) showInterviewResults();
-      else { ivQIdx++; renderQuestion(); }
-    };
-  }
-};
+// ── Model answer reveal — handled inside initInterviewListeners ──
 
 // ── Results screen ────────────────────────────────────────────
 function showInterviewResults() {
@@ -352,21 +334,54 @@ function showInterviewResults() {
   $iv('iv-result-detail').innerHTML = detailHTML;
 }
 
-// ── Navigation wiring ─────────────────────────────────────────
-$iv('iv-back-to-menu').onclick   = () => { stopSpeaking(); stopListening(); hide('iv-level-screen'); goMenu(); };
-$iv('iv-back-to-levels').onclick = () => { stopSpeaking(); hide('iv-session-screen'); show('iv-level-screen'); };
-$iv('iv-quit-session').onclick   = async () => {
-  stopSpeaking(); stopListening();
-  const ok = await openModal('セッションを終了しますか？', '現在の進捗は保存されません。', '終了する');
-  if (!ok) return;
-  hide('iv-quiz-screen'); show('iv-session-screen'); buildSessionMenu(ivLevel);
-};
-$iv('iv-results-retry').onclick  = () => { hide('iv-results-screen'); startSession(ivSession); };
-$iv('iv-results-menu').onclick   = () => { stopSpeaking(); hide('iv-results-screen'); show('iv-session-screen'); buildSessionMenu(ivLevel); };
+// ── Navigation wiring (deferred until DOM confirmed ready) ────
+function initInterviewListeners() {
+  const wire = (id, fn) => { const el = document.getElementById(id); if (el) el.onclick = fn; };
 
-// Level selector buttons
-document.querySelectorAll('.iv-level-btn').forEach(btn => {
-  btn.addEventListener('click', function() {
-    startInterviewLevel(this.getAttribute('data-iv-level'));
+  wire('iv-back-to-menu',   () => { stopSpeaking(); stopListening(); hide('iv-level-screen'); goMenu(); });
+  wire('iv-back-to-levels', () => { stopSpeaking(); hide('iv-session-screen'); show('iv-level-screen'); });
+  wire('iv-quit-session',   async () => {
+    stopSpeaking(); stopListening();
+    const ok = await openModal('セッションを終了しますか？', '現在の進捗は保存されません。', '終了する');
+    if (!ok) return;
+    hide('iv-quiz-screen'); show('iv-session-screen'); buildSessionMenu(ivLevel);
   });
-});
+  wire('iv-results-retry',  () => { hide('iv-results-screen'); startSession(ivSession); });
+  wire('iv-results-menu',   () => { stopSpeaking(); hide('iv-results-screen'); show('iv-session-screen'); buildSessionMenu(ivLevel); });
+  wire('iv-btn-reveal', function() {
+    const q = ivSession.questions[ivQIdx];
+    const existing = document.getElementById('iv-feedback-area').innerHTML;
+    document.getElementById('iv-feedback-area').innerHTML = existing
+      + '<div class="iv-model-answer"><div class="iv-model-label">模範解答：</div>'
+      + '<div class="iv-model-text">' + escHtml(q.model) + '</div></div>';
+    this.style.display = 'none';
+    speakText(q.model);
+    const nextBtn = document.getElementById('iv-btn-next');
+    if (nextBtn && nextBtn.style.display === 'none') {
+      nextBtn.style.display = '';
+      nextBtn.textContent = ivQIdx+1 >= ivSession.questions.length ? '結果を見る →' : '次の質問 →';
+      nextBtn.onclick = () => {
+        stopSpeaking();
+        if (ivQIdx+1 >= ivSession.questions.length) showInterviewResults();
+        else { ivQIdx++; renderQuestion(); }
+      };
+    }
+  });
+
+  // Level selector buttons
+  document.querySelectorAll('.iv-level-btn').forEach(btn => {
+    btn.addEventListener('click', function() {
+      startInterviewLevel(this.getAttribute('data-iv-level'));
+    });
+  });
+
+  console.log('[Interview] Listeners attached.');
+}
+
+// Run after DOM is ready (scripts are at end of body so DOM is ready,
+// but use DOMContentLoaded as a safety net for cached/reordered loads)
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initInterviewListeners);
+} else {
+  initInterviewListeners();
+}
