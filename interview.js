@@ -46,8 +46,7 @@ function startListening(onResult, onError) {
   isListening = true;
   recognition.onresult = e => {
     isListening = false;
-    const transcript = Array.from(e.results[0])
-      .map(alt => alt.transcript).join(' ');
+    const transcript = e.results[0][0].transcript;
     onResult(transcript.trim());
   };
   recognition.onerror = e => {
@@ -173,14 +172,17 @@ function renderPassagePhase() {
       $iv('iv-btn-listen').disabled = false;
       ivPassageRead = true;
       $iv('iv-btn-next').style.display = '';
+      $iv('iv-btn-next').style.background = cfg().accent;
     });
     ivPassageRead = true;
     $iv('iv-btn-next').style.display = '';
+      $iv('iv-btn-next').style.background = cfg().accent;
   };
 
   $iv('iv-btn-record').style.display = 'none';
   $iv('iv-btn-reveal').style.display = 'none';
   $iv('iv-btn-next').style.display = 'none';
+  $iv('iv-btn-next').style.background = cfg().accent;
   $iv('iv-btn-next').textContent = '質問へ進む →';
   $iv('iv-btn-next').onclick = () => { ivPhase = 'question'; ivRenderQuestion(); };
   $iv('iv-transcript-area').innerHTML = '';
@@ -226,6 +228,7 @@ function ivRenderQuestion() {
 
   $iv('iv-btn-reveal').style.display = 'none';
   $iv('iv-btn-next').style.display = 'none';
+  $iv('iv-btn-next').style.background = cfg().accent;
   $iv('iv-transcript-area').innerHTML = '';
   $iv('iv-feedback-area').innerHTML = '';
 }
@@ -275,6 +278,7 @@ function handleRecord() {
       $iv('iv-btn-record').onclick = handleRecord;
       $iv('iv-btn-reveal').style.display = '';
       $iv('iv-btn-next').style.display = '';
+      $iv('iv-btn-next').style.background = cfg().accent;
       $iv('iv-btn-next').textContent = ivQIdx+1 >= ivSession.questions.length ? '結果を見る →' : '次の質問 →';
       $iv('iv-btn-next').onclick = () => {
         stopSpeaking();
@@ -361,6 +365,7 @@ function initInterviewListeners() {
     const nextBtn = document.getElementById('iv-btn-next');
     if (nextBtn && nextBtn.style.display === 'none') {
       nextBtn.style.display = '';
+      nextBtn.style.background = cfg().accent;
       nextBtn.textContent = ivQIdx+1 >= ivSession.questions.length ? '結果を見る →' : '次の質問 →';
       nextBtn.onclick = () => {
         stopSpeaking();
