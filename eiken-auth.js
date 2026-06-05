@@ -360,13 +360,13 @@ window.hk.onAuthChange(async function(user) {
 
 // ── Sync on session end ───────────────────────────────────────────────────────
 // Directly patch recordSession once DOM is ready (it's a global function in app.js)
-document.addEventListener('DOMContentLoaded', function() {
+// ── Sync on session end ───────────────────────────────────────────────────────
+// Patch recordSession and interview sync — runs immediately since scripts load at bottom of body
+(function() {
   const _origRecord = window.recordSession;
   window.recordSession = function(res) {
-    // Always call the original localStorage save first
     if (typeof _origRecord === 'function') _origRecord(res);
 
-    // Then sync to Supabase
     (async function() {
       const user = await window.hk.getUser();
       if (!user) return;
@@ -403,13 +403,12 @@ document.addEventListener('DOMContentLoaded', function() {
       showSyncBadge('✓ 成績を保存しました');
     })();
   };
-});
-  // Patch interview results sync (interview.js stores results in iv_sessionResults)
-  // We hook into the results screen render
-  const origShowIvResults = window.showIvResults;
-  if (typeof origShowIvResults === 'function') {
+
+  // Interview sync
+  const _origShowIvResults = window.showIvResults;
+  if (typeof _origShowIvResults === 'function') {
     window.showIvResults = function(level, sessionId, topic, scores) {
-      origShowIvResults.apply(this, arguments);
+      _origShowIvResults.apply(this, arguments);
       (async function() {
         const user = await window.hk.getUser();
         if (!user || !scores || scores.length === 0) return;
@@ -421,4 +420,4 @@ document.addEventListener('DOMContentLoaded', function() {
       })();
     };
   }
-});
+})();
