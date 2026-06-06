@@ -108,15 +108,41 @@
       <div class="hk-auth-success" id="hk-auth-success"></div>
 
       <div id="hk-form-login">
-        <div class="hk-field">
-          <label>メールアドレス</label>
-          <input type="email" id="hk-login-email" placeholder="example@school.ed.jp" autocomplete="email">
+        <div style="display:flex;gap:0;border:1.5px solid var(--border);border-radius:7px;overflow:hidden;margin-bottom:14px">
+          <button id="hk-tab-email"
+            style="flex:1;padding:7px;background:#1565C0;color:#fff;border:none;
+                   font-size:11px;font-weight:700;cursor:pointer;font-family:inherit"
+            onclick="hkSwitchLoginTab('email')">📧 メール</button>
+          <button id="hk-tab-sid"
+            style="flex:1;padding:7px;background:var(--surface);color:var(--text2);
+                   border:none;border-left:1.5px solid var(--border);
+                   font-size:11px;font-weight:700;cursor:pointer;font-family:inherit"
+            onclick="hkSwitchLoginTab('sid')">🎓 学籍番号</button>
         </div>
-        <div class="hk-field">
-          <label>パスワード</label>
-          <input type="password" id="hk-login-pass" placeholder="••••••••" autocomplete="current-password">
+
+        <div id="hk-login-email-fields">
+          <div class="hk-field">
+            <label>メールアドレス</label>
+            <input type="email" id="hk-login-email" placeholder="example@school.ed.jp" autocomplete="email">
+          </div>
+          <div class="hk-field">
+            <label>パスワード</label>
+            <input type="password" id="hk-login-pass" placeholder="••••••••" autocomplete="current-password">
+          </div>
+          <button class="hk-forgot" id="hk-forgot-btn">パスワードを忘れた場合</button>
         </div>
-        <button class="hk-forgot" id="hk-forgot-btn">パスワードを忘れた場合</button>
+
+        <div id="hk-login-sid-fields" style="display:none">
+          <div class="hk-field">
+            <label>学籍番号</label>
+            <input type="text" id="hk-login-sid" placeholder="例：S001" autocomplete="username">
+          </div>
+          <div class="hk-field">
+            <label>パスワード</label>
+            <input type="password" id="hk-login-sidpass" placeholder="••••••••" autocomplete="current-password">
+          </div>
+        </div>
+
         <button class="hk-auth-primary" id="hk-login-btn">ログイン</button>
         <div class="hk-auth-toggle">
           アカウントをお持ちでない方は
@@ -168,6 +194,7 @@
   document.getElementById('hk-logout-btn').onclick  = handleLogout;
   document.getElementById('hk-forgot-btn').onclick  = handleForgot;
   document.getElementById('hk-login-pass').addEventListener('keydown', e => { if (e.key === 'Enter') handleLogin(); });
+  document.getElementById('hk-login-sidpass') && document.getElementById('hk-login-sidpass').addEventListener('keydown', e => { if (e.key === 'Enter') handleLogin(); });
   document.getElementById('hk-signup-pass').addEventListener('keydown', e => { if (e.key === 'Enter') handleSignup(); });
 })();
 
@@ -229,19 +256,48 @@ function setAuthBtnLoading(id, loading) {
 }
 
 // ── Auth actions ──────────────────────────────────────────────────────────────
+let _hkLoginTab = 'email';
+function hkSwitchLoginTab(tab) {
+  _hkLoginTab = tab;
+  const isEmail = tab === 'email';
+  const te = document.getElementById('hk-tab-email');
+  const ts = document.getElementById('hk-tab-sid');
+  if (te) { te.style.background = isEmail ? '#1565C0' : 'var(--surface)'; te.style.color = isEmail ? '#fff' : 'var(--text2)'; }
+  if (ts) { ts.style.background = isEmail ? 'var(--surface)' : '#1565C0'; ts.style.color = isEmail ? 'var(--text2)' : '#fff'; }
+  const ef = document.getElementById('hk-login-email-fields');
+  const sf = document.getElementById('hk-login-sid-fields');
+  if (ef) ef.style.display = isEmail ? '' : 'none';
+  if (sf) sf.style.display = isEmail ? 'none' : '';
+}
+
 async function handleLogin() {
-  const email = document.getElementById('hk-login-email').value.trim();
-  const pass  = document.getElementById('hk-login-pass').value;
-  if (!email || !pass) { showAuthError('メールアドレスとパスワードを入力してください。'); return; }
-  setAuthBtnLoading('hk-login-btn', true);
   clearAuthMessages();
-  try {
-    await window.hk.signIn(email, pass);
-    closeAuthModal();
-  } catch (e) {
-    showAuthError('ログインに失敗しました：' + (e.message || '入力内容を確認してください。'));
-  } finally {
-    setAuthBtnLoading('hk-login-btn', false);
+  if (_hkLoginTab === 'sid') {
+    const sid  = (document.getElementById('hk-login-sid')    || {value:''}).value.trim();
+    const pass = (document.getElementById('hk-login-sidpass')|| {value:''}).value;
+    if (!sid || !pass) { showAuthError('学籍番号とパスワードを入力してください。'); return; }
+    setAuthBtnLoading('hk-login-btn', true);
+    try {
+      await window.hk.signInWithStudentId(sid, pass);
+      closeAuthModal();
+    } catch (e) {
+      showAuthError('ログインに失敗しました：学籍番号またはパスワードが正しくありません。');
+    } finally {
+      setAuthBtnLoading('hk-login-btn', false);
+    }
+  } else {
+    const email = document.getElementById('hk-login-email').value.trim();
+    const pass  = document.getElementById('hk-login-pass').value;
+    if (!email || !pass) { showAuthError('メールアドレスとパスワードを入力してください。'); return; }
+    setAuthBtnLoading('hk-login-btn', true);
+    try {
+      await window.hk.signIn(email, pass);
+      closeAuthModal();
+    } catch (e) {
+      showAuthError('ログインに失敗しました：' + (e.message || '入力内容を確認してください。'));
+    } finally {
+      setAuthBtnLoading('hk-login-btn', false);
+    }
   }
 }
 
