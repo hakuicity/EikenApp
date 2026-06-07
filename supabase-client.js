@@ -236,22 +236,34 @@
     // ── Student-ID auth ─────────────────────────────────────────────────────
     // Derives a consistent system email from a student number.
     // e.g. "S001" → "st.s001@hakuicity.ed.jp"
-    function hkStudentEmail(studentNumber) {
+    // Derives a system email for a student using the teacher's real domain,
+    // so the domain is guaranteed to be valid in Supabase.
+    // e.g. teacher "l.kincer@hakui.isk.ed.jp", student "S001"
+    //      → "st.s001@hakui.isk.ed.jp"
+    function hkStudentEmail(studentNumber, domain) {
       const safe = String(studentNumber).toLowerCase().replace(/[^a-z0-9-]/g, '');
-      return 'st.' + safe + '@hakuicity.ed.jp';
+      return 'st.' + safe + '@' + domain;
     }
 
-    // Sign in using student number + password (no email needed)
+    // Sign in using student number + password.
+    // Looks up the stored auth email via a public RPC (no auth required).
     async function hkSignInWithStudentId(studentNumber, password) {
-      const email = hkStudentEmail(studentNumber);
-      return await hkSignIn(email, password);
+      const { data, error } = await hkClient.rpc('get_student_auth_email', {
+        p_student_number: studentNumber
+      });
+      if (error || !data) throw new Error('学籍番号が見つかりません。');
+      return await hkSignIn(data, password);
     }
 
     // Create a Supabase auth account for a student (called by teacher from
     // enrollment panel). Uses a temporary isolated client so the teacher's
     // own session is never disturbed.
     async function hkCreateStudentAccount(studentNumber, password) {
-      const email = hkStudentEmail(studentNumber);
+      // Use the currently signed-in teacher's email domain
+      const currentUser = await hkGetUser();
+      if (!currentUser) throw new Error('ログインが必要です。');
+      const domain = currentUser.email.split('@')[1];
+      const email  = hkStudentEmail(studentNumber, domain);
 
       // Isolated client — no localStorage writes, won't touch teacher session
       const tmp = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
@@ -286,13 +298,14 @@
         // Student's own session creates their profile (satisfies RLS)
         await tmp.from('profiles').upsert(profileData);
 
-        // Teacher's session links the roster entry
-        if (entry) {
-          await hkClient
-            .from('student_roster')
-            .update({ linked_user_id: data.user.id })
-            .eq('student_number', studentNumber);
-        }
+        // Teacher's session links the roster entry and stores the auth email
+        await hkClient
+          .from('student_roster')
+          .update({
+            linked_user_id: data.user.id,
+            auth_email:     email
+          })
+          .eq('student_number', studentNumber);
       }
       return data;
     }
