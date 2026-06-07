@@ -255,59 +255,28 @@
       return await hkSignIn(data, password);
     }
 
-    // Create a Supabase auth account for a student (called by teacher from
-    // enrollment panel). Uses a temporary isolated client so the teacher's
-    // own session is never disturbed.
+    // Create a student account via Edge Function (uses admin API — no emails,
+    // no rate limits). The teacher's JWT is forwarded for auth verification.
     async function hkCreateStudentAccount(studentNumber, password) {
-      // Use the currently signed-in teacher's email domain
       const currentUser = await hkGetUser();
       if (!currentUser) throw new Error('ログインが必要です。');
-      const domain = currentUser.email.split('@')[1];
-      const email  = hkStudentEmail(studentNumber, domain);
+      const domain  = currentUser.email.split('@')[1];
+      const email   = hkStudentEmail(studentNumber, domain);
+      const session = await hkGetSession();
 
-      // Isolated client — no localStorage writes, won't touch teacher session
-      const tmp = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
-        auth: {
-          persistSession:     false,
-          autoRefreshToken:   false,
-          detectSessionInUrl: false,
-          storage: { getItem: () => null, setItem: () => {}, removeItem: () => {} }
-        }
+      const resp = await fetch(SUPABASE_URL + '/functions/v1/create-student', {
+        method: 'POST',
+        headers: {
+          'Content-Type':  'application/json',
+          'Authorization': 'Bearer ' + session.access_token,
+          'apikey':        SUPABASE_KEY
+        },
+        body: JSON.stringify({ student_number: studentNumber, password, email })
       });
 
-      const { data, error } = await tmp.auth.signUp({ email, password });
-      if (error) throw error;
-
-      if (data.user && data.session) {
-        // Look up roster entry for class/school info
-        const { data: entry } = await hkClient
-          .from('student_roster')
-          .select('*')
-          .eq('student_number', studentNumber)
-          .single();
-
-        const profileData = {
-          id:             data.user.id,
-          student_number: studentNumber,
-          role:           'student',
-          display_name:   (entry && entry.display_name) || studentNumber,
-          ...(entry && entry.class_name ? { class_name: entry.class_name } : {}),
-          ...(entry && entry.school     ? { school:     entry.school }     : {})
-        };
-
-        // Student's own session creates their profile (satisfies RLS)
-        await tmp.from('profiles').upsert(profileData);
-
-        // Teacher's session links the roster entry and stores the auth email
-        await hkClient
-          .from('student_roster')
-          .update({
-            linked_user_id: data.user.id,
-            auth_email:     email
-          })
-          .eq('student_number', studentNumber);
-      }
-      return data;
+      const result = await resp.json();
+      if (!resp.ok) throw new Error(result.error || 'アカウントの作成に失敗しました');
+      return result;
     }
 
     // ── Auth state listener ─────────────────────────────────────────────────
