@@ -144,31 +144,9 @@
         </div>
 
         <button class="hk-auth-primary" id="hk-login-btn">ログイン</button>
-        <div class="hk-auth-toggle">
-          アカウントをお持ちでない方は
-          <button id="hk-goto-signup">新規登録</button>
-        </div>
+
       </div>
 
-      <div id="hk-form-signup" style="display:none">
-        <div class="hk-field">
-          <label>お名前（表示名）</label>
-          <input type="text" id="hk-signup-name" placeholder="例：山田 太郎">
-        </div>
-        <div class="hk-field">
-          <label>メールアドレス</label>
-          <input type="email" id="hk-signup-email" placeholder="example@school.ed.jp" autocomplete="email">
-        </div>
-        <div class="hk-field">
-          <label>パスワード（8文字以上）</label>
-          <input type="password" id="hk-signup-pass" placeholder="••••••••" autocomplete="new-password">
-        </div>
-        <button class="hk-auth-primary" id="hk-signup-btn">アカウントを作成</button>
-        <div class="hk-auth-toggle">
-          すでにアカウントをお持ちの方は
-          <button id="hk-goto-login">ログイン</button>
-        </div>
-      </div>
 
       <div id="hk-form-loggedin" style="display:none">
         <p id="hk-loggedin-name" style="font-size:16px;font-weight:700;color:var(--text);margin-bottom:6px"></p>
@@ -187,15 +165,13 @@
 
   document.getElementById('hk-auth-close').onclick = closeAuthModal;
   modal.addEventListener('click', e => { if (e.target === modal) closeAuthModal(); });
-  document.getElementById('hk-goto-signup').onclick = () => showAuthForm('signup');
-  document.getElementById('hk-goto-login').onclick  = () => showAuthForm('login');
+
   document.getElementById('hk-login-btn').onclick   = handleLogin;
-  document.getElementById('hk-signup-btn').onclick  = handleSignup;
+
   document.getElementById('hk-logout-btn').onclick  = handleLogout;
   document.getElementById('hk-forgot-btn').onclick  = handleForgot;
   document.getElementById('hk-login-pass').addEventListener('keydown', e => { if (e.key === 'Enter') handleLogin(); });
   document.getElementById('hk-login-sidpass') && document.getElementById('hk-login-sidpass').addEventListener('keydown', e => { if (e.key === 'Enter') handleLogin(); });
-  document.getElementById('hk-signup-pass').addEventListener('keydown', e => { if (e.key === 'Enter') handleSignup(); });
 })();
 
 // ── Modal helpers ─────────────────────────────────────────────────────────────
@@ -221,12 +197,11 @@ function closeAuthModal() {
 function showAuthForm(form) {
   clearAuthMessages();
   document.getElementById('hk-form-login').style.display    = form === 'login'    ? '' : 'none';
-  document.getElementById('hk-form-signup').style.display   = form === 'signup'   ? '' : 'none';
   document.getElementById('hk-form-loggedin').style.display = form === 'loggedin' ? '' : 'none';
-  const titles = { login: 'ログイン', signup: '新規登録', loggedin: 'アカウント' };
-  const subs   = { login: '成績をクラウドに保存します', signup: '無料アカウントを作成します', loggedin: 'ログイン済み' };
-  document.getElementById('hk-auth-title').textContent = titles[form];
-  document.getElementById('hk-auth-sub').textContent   = subs[form];
+  const titles = { login: 'ログイン', loggedin: 'アカウント' };
+  const subs   = { login: '成績をクラウドに保存します', loggedin: 'ログイン済み' };
+  document.getElementById('hk-auth-title').textContent = titles[form] || '';
+  document.getElementById('hk-auth-sub').textContent   = subs[form]   || '';
 }
 
 function showAuthError(msg) {
@@ -251,7 +226,6 @@ function setAuthBtnLoading(id, loading) {
   if (!btn) return;
   btn.disabled = loading;
   if (id === 'hk-login-btn')  btn.textContent = loading ? '処理中...' : 'ログイン';
-  if (id === 'hk-signup-btn') btn.textContent = loading ? '処理中...' : 'アカウントを作成';
   if (id === 'hk-logout-btn') btn.textContent = loading ? '処理中...' : 'ログアウト';
 }
 
@@ -301,24 +275,6 @@ async function handleLogin() {
   }
 }
 
-async function handleSignup() {
-  const name  = document.getElementById('hk-signup-name').value.trim();
-  const email = document.getElementById('hk-signup-email').value.trim();
-  const pass  = document.getElementById('hk-signup-pass').value;
-  if (!email || !pass) { showAuthError('メールアドレスとパスワードを入力してください。'); return; }
-  if (pass.length < 8)  { showAuthError('パスワードは8文字以上で設定してください。'); return; }
-  setAuthBtnLoading('hk-signup-btn', true);
-  clearAuthMessages();
-  try {
-    await window.hk.signUp(email, pass, name);
-    showAuthSuccess('登録が完了しました！確認メールをご確認ください。');
-    setTimeout(() => { clearAuthMessages(); showAuthForm('login'); }, 3000);
-  } catch (e) {
-    showAuthError('登録に失敗しました：' + (e.message || '入力内容を確認してください。'));
-  } finally {
-    setAuthBtnLoading('hk-signup-btn', false);
-  }
-}
 
 async function handleLogout() {
   setAuthBtnLoading('hk-logout-btn', true);
