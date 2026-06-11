@@ -77,6 +77,13 @@
       font-weight: 700; z-index: 500; opacity: 0; transition: opacity .3s; pointer-events: none;
     }
     #hk-sync-badge.show { opacity: 1; }
+    #hk-gate-overlay {
+      position: fixed; inset: 0; background: var(--bg, #fff);
+      z-index: 999; display: flex; align-items: center; justify-content: center;
+    }
+    #hk-gate-overlay.hidden { display: none; }
+    #hk-gate-overlay p { color: var(--text2); font-size: 14px; }
+    #hk-auth-modal.gate-mode .hk-auth-close { display: none; }
   `;
   document.head.appendChild(style);
 })();
@@ -90,6 +97,12 @@
 
   const controls = document.querySelector('.top-controls');
   if (controls) controls.appendChild(btn);
+
+  const gate = document.createElement('div');
+  gate.id = 'hk-gate-overlay';
+  gate.className = 'hidden';
+  gate.innerHTML = `<p>読み込み中...</p>`;
+  document.body.appendChild(gate);
 
   const badge = document.createElement('div');
   badge.id = 'hk-sync-badge';
@@ -191,7 +204,9 @@ async function openAuthModal() {
 }
 
 function closeAuthModal() {
-  document.getElementById('hk-auth-modal').classList.add('hidden');
+  const modal = document.getElementById('hk-auth-modal');
+  if (modal.classList.contains('gate-mode')) return; // login required, can't dismiss
+  modal.classList.add('hidden');
 }
 
 function showAuthForm(form) {
@@ -310,8 +325,25 @@ function showSyncBadge(msg) {
   _syncTimer = setTimeout(() => badge.classList.remove('show'), 2800);
 }
 
+// ── Login gate ────────────────────────────────────────────────────────────────
+function applyAuthGate(user) {
+  const overlay = document.getElementById('hk-gate-overlay');
+  const modal   = document.getElementById('hk-auth-modal');
+  if (user) {
+    overlay.classList.add('hidden');
+    modal.classList.remove('gate-mode');
+  } else {
+    overlay.classList.remove('hidden');
+    modal.classList.add('gate-mode');
+    modal.classList.remove('hidden');
+    clearAuthMessages();
+    showAuthForm('login');
+  }
+}
+
 // ── Auth state → update button ────────────────────────────────────────────────
 window.hk.onAuthChange(async function(user) {
+  applyAuthGate(user);
   const btn = document.getElementById('hk-auth-btn');
   if (!btn) return;
   if (user) {
